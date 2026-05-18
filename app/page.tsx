@@ -2,18 +2,10 @@
 
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-
-type Product = {
-  id: number;
-  title: string;
-  category: string;
-};
-
-type ProductsResponse = {
-  products: Product[];
-};
-
-type SortOption = 'relevance' | 'title-asc' | 'title-desc';
+import { SearchInput } from './components/SearchInput';
+import ProductControls from './components/ProductControls';
+import ProductList from './components/ProductList';
+import { Product, SortOption, ProductsResponse } from './types';
 
 export default function Page() {
   const [search, setSearch] = useState('');
@@ -22,6 +14,8 @@ export default function Page() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('relevance');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  
 
   useEffect(() => {
     if (!debouncedSearch.trim()) return;
@@ -37,6 +31,7 @@ export default function Page() {
           { signal },
         );
         setProducts(result.data.products);
+        setSelectedCategory('all');
       } catch (error) {
         if (axios.isCancel(error)) {
           return;
@@ -66,9 +61,19 @@ export default function Page() {
 
     return () => clearTimeout(timeout);
   }, [search]);
+
   const shouldSearch = search.trim().length > 0;
 
-  const sortedProducts = [...products].sort((a, b) => {
+  const categories = Array.from(
+    new Set(products.map((product) => product.category)),
+  );
+
+  const filteredProducts =
+    selectedCategory === 'all'
+      ? products
+      : products.filter((product) => product.category === selectedCategory);
+
+  const visibleProducts = [...filteredProducts].sort((a, b) => {
     if (sortOption === 'title-asc') {
       return a.title.localeCompare(b.title);
     }
@@ -80,42 +85,31 @@ export default function Page() {
     return 0;
   });
 
-  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortOption(event.target.value as SortOption);
-  };
+  console.log(typeof visibleProducts);
 
   return (
     <main className="p-8">
       <h1 className="text-2xl font-bold">Product Search</h1>
 
-      <input
-        className="border p-2 mt-4"
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <SearchInput search={search} setSearch={setSearch} />
       {error && <p>{error}</p>}
       {loading && <p>Loading...</p>}
-      {debouncedSearch && !error && !loading && sortedProducts.length < 1 && (
+      {debouncedSearch && !error && !loading && visibleProducts.length < 1 && (
         <p>No products available</p>
       )}
 
-      <select
-        name="sorted"
-        id="sorted"
-        value={sortOption}
-        onChange={handleChange}
-      >
-        <option value="relevance">relevance</option>
-        <option value="title-asc">title-asc</option>
-        <option value="title-desc">title-desc</option>
-      </select>
-      <ul className="mt-4">
-        {shouldSearch &&
-          sortedProducts.map((product) => (
-            <li key={product.id}>{product.title}</li>
-          ))}
-      </ul>
+      <ProductControls
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        categories={categories}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
+      />
+
+      <ProductList
+        shouldSearch={shouldSearch}
+        visibleProducts={visibleProducts}
+      />
     </main>
   );
 }
